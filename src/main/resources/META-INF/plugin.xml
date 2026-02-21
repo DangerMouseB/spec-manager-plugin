@@ -1,0 +1,44 @@
+<idea-plugin>
+    <id>sm.spec.manager</id>
+    <name>Spec Manager</name>
+    <vendor email="local@invalid" url="https://example.invalid">Local</vendor>
+
+    <description><![CDATA[
+    Spec Manager (SM) — a tool window for organising specs, plans, notes and test scenarios inside JetBrains IDEs.
+    ]]></description>
+
+    <depends>com.intellij.modules.platform</depends>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <toolWindow id="SM"
+                    anchor="left"
+                    icon="/icons/sm_13.svg"
+                    factoryClass="sm.toolwindow.SmToolWindowFactory"/>
+
+        <!-- WYSIWYG editor for .rtf files — opens in the main editor tab area -->
+        <fileEditorProvider implementation="sm.editor.SmRichTextEditorProvider"/>
+
+        <!-- Table editor for .csv files — shows "Table" tab alongside the text tab -->
+        <fileEditorProvider implementation="sm.editor.SmCsvEditorProvider"/>
+    </extensions>
+
+    <actions>
+        <!-- SM menu in the main menu bar -->
+        <group id="SMMainMenu" text="SM" popup="true">
+            <add-to-group group-id="MainMenu" anchor="before" relative-to-action="HelpMenu"/>
+            <action id="SM.AddRoot" class="sm.actions.SmAddRootAction" text="Add Root…"
+                    description="Add a document root folder to the SM tree"/>
+            <action id="SM.RemoveRoot" class="sm.actions.SmRemoveRootAction" text="Remove Selected Root"
+                    description="Remove the currently selected root from the SM tree"/>
+            <separator/>
+            <action id="SM.Refresh" class="sm.actions.SmRefreshAction" text="Refresh All"
+                    description="Refresh the SM tree from disk"/>
+            <separator/>
+            <action id="SM.Settings" class="sm.actions.SmSettingsAction" text="Settings…"
+                    description="Configure SM extension visibility and per-root settings"/>
+            <separator/>
+            <action id="SM.About" class="sm.actions.SmAboutAction" text="About SM"
+                    description="Show Spec Manager version and info"/>
+        </group>
+    </actions>
+</idea-plugin>

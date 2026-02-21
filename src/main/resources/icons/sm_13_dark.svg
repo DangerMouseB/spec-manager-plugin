@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 13 13" width="13" height="13">
+  <!-- Document page with folded corner (dark theme — lighter greys) -->
+  <path d="M3 1 L9 1 L11 3 L11 12 L3 12 Z" fill="#B0B0B0" stroke="#909090" stroke-width="0.6" stroke-linejoin="round"/>
+  <!-- Folded corner -->
+  <path d="M9 1 L9 3 L11 3" fill="#989898" stroke="#909090" stroke-width="0.4" stroke-linejoin="round"/>
+  <!-- Text lines -->
+  <line x1="4.5" y1="4.5" x2="9.5" y2="4.5" stroke="#707070" stroke-width="0.7" stroke-linecap="round"/>
+  <line x1="4.5" y1="6.2" x2="9.5" y2="6.2" stroke="#707070" stroke-width="0.7" stroke-linecap="round"/>
+  <line x1="4.5" y1="7.9" x2="8" y2="7.9" stroke="#707070" stroke-width="0.7" stroke-linecap="round"/>
+  <!-- Small checkmark -->
+  <path d="M4.5 9.8 L5.8 11 L8.5 8.5" fill="none" stroke="#606060" stroke-width="0.9" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
+

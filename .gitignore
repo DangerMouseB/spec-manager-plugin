@@ -1,0 +1,8 @@
+
+.DS_Store
+.gradle/
+.intellijPlatform/
+build/
+.idea/
+/shelf/
+/workspace.xml

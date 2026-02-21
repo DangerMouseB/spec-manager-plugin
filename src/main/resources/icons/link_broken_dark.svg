@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 13 13" width="13" height="13">
+  <!-- Broken link — red X (dark theme) -->
+  <line x1="3" y1="3" x2="10" y2="10" stroke="#FF6666" stroke-width="1.8" stroke-linecap="round"/>
+  <line x1="10" y1="3" x2="3" y2="10" stroke="#FF6666" stroke-width="1.8" stroke-linecap="round"/>
+</svg>
+
