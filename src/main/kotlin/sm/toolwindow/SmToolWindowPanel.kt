@@ -75,10 +75,16 @@ class SmToolWindowPanel(private val project: Project) : JPanel(BorderLayout()) {
             private val HIDDEN_COLOR = Color(140, 140, 140)
             private val BROKEN_COLOR = Color(200, 80, 80)
             private val CIRCULAR_COLOR = Color(160, 160, 160)
+            init {
+                // Prevent DefaultTreeCellRenderer painting its own background (shows as grey on Windows)
+                isOpaque = false
+                backgroundNonSelectionColor = null
+            }
             override fun getTreeCellRendererComponent(
                 tree: JTree, value: Any?, sel: Boolean, expanded: Boolean, leaf: Boolean, row: Int, hasFocus: Boolean
             ): Component {
                 val c = super.getTreeCellRendererComponent(tree, value, sel, expanded, leaf, row, hasFocus)
+                if (!sel) { backgroundNonSelectionColor = null; (c as? JComponent)?.isOpaque = false }
                 val node = value as? DefaultMutableTreeNode; val data = node?.userObject as? NodeData
                 if (data != null) {
                     val base = c.font ?: UIManager.getFont("Tree.font") ?: Font("SansSerif", Font.PLAIN, 12)
@@ -182,6 +188,7 @@ class SmToolWindowPanel(private val project: Project) : JPanel(BorderLayout()) {
         val popup = JPopupMenu()
         popup.add(JMenuItem("Add Root…").apply { addActionListener { addRoot() } })
         popup.add(JMenuItem("Remove This Root").apply { addActionListener { removeSelectedRoot() } })
+        popup.add(JMenuItem("Close All Files Under Root  (⌘⇧W)").apply { addActionListener { closeFilesUnderSelectedRoot() } })
         popup.addSeparator()
 
         val selPath = tree.selectionPath; val selNode = selPath?.lastPathComponent as? VfNode
@@ -344,6 +351,14 @@ class SmToolWindowPanel(private val project: Project) : JPanel(BorderLayout()) {
 
     fun getRoots(): List<VirtualFile> = roots.toList()
     private fun copyToClipboard(text: String) { Toolkit.getDefaultToolkit().systemClipboard.setContents(StringSelection(text), null) }
+
+    fun closeFilesUnderSelectedRoot() {
+        val path = tree.selectionPath ?: return; if (path.pathCount < 2) return
+        val rootNode = path.getPathComponent(1) as? VfNode ?: return; val data = rootNode.userObject as? NodeData ?: return
+        val rootVf = data.vf ?: return
+        val fem = FileEditorManager.getInstance(project)
+        for (openFile in fem.openFiles) { if (openFile.path.startsWith(rootVf.path + "/") || openFile.path == rootVf.path) fem.closeFile(openFile) }
+    }
 
     private fun addLink(folderNode: VfNode, folderData: NodeData) {
         val folder = folderData.vf ?: return; val dialog = SmLinkDialog(folder); dialog.isVisible = true; if (!dialog.confirmed) return

@@ -25,6 +25,10 @@ class SmSettingsAction : AnAction("Settings…"), DumbAware {
     override fun actionPerformed(e: AnActionEvent) { findPanel(e)?.openSettings() }
 }
 
+class SmCloseRootFilesAction : AnAction("Close All Files Under Root"), DumbAware {
+    override fun actionPerformed(e: AnActionEvent) { findPanel(e)?.closeFilesUnderSelectedRoot() }
+}
+
 class SmAboutAction : AnAction("About SM"), DumbAware {
     override fun actionPerformed(e: AnActionEvent) {
         val version = PluginManagerCore.getPlugin(PluginId.getId("sm.spec.manager"))?.version ?: "dev"

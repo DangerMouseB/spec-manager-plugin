@@ -4,7 +4,7 @@ plugins {
 }
 
 group = "sm"
-version = "2026.02.23.1"
+version = "2026.02.23.3"
 
 repositories { mavenCentral() }
 

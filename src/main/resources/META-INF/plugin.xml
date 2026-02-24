@@ -30,6 +30,11 @@
                     description="Add a document root folder to the SM tree"/>
             <action id="SM.RemoveRoot" class="sm.actions.SmRemoveRootAction" text="Remove Selected Root"
                     description="Remove the currently selected root from the SM tree"/>
+            <action id="SM.CloseRootFiles" class="sm.actions.SmCloseRootFilesAction"
+                    text="Close All Files Under Root"
+                    description="Close all open editor tabs belonging to the selected root">
+                <keyboard-shortcut keymap="$default" first-keystroke="shift meta W"/>
+            </action>
             <separator/>
             <action id="SM.Refresh" class="sm.actions.SmRefreshAction" text="Refresh All"
                     description="Refresh the SM tree from disk"/>
