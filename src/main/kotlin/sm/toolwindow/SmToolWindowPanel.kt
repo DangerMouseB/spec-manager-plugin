@@ -1,6 +1,14 @@
 package sm.toolwindow
 
 import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.actionSystem.ActionManager
+import com.intellij.openapi.actionSystem.ActionPlaces
+import com.intellij.openapi.actionSystem.CommonDataKeys
+import com.intellij.openapi.actionSystem.DataProvider
+import com.intellij.openapi.actionSystem.DefaultActionGroup
+import com.intellij.openapi.actionSystem.PlatformDataKeys
+import com.intellij.openapi.actionSystem.Separator
+import com.intellij.ide.DataManager
 import com.intellij.openapi.fileChooser.FileChooser
 import com.intellij.openapi.fileChooser.FileChooserDescriptorFactory
 import com.intellij.openapi.fileEditor.FileEditorManager
@@ -15,6 +23,8 @@ import com.intellij.openapi.vfs.VirtualFileEvent
 import com.intellij.openapi.vfs.VirtualFileListener
 import com.intellij.openapi.vfs.VirtualFileMoveEvent
 import com.intellij.openapi.vfs.VirtualFilePropertyEvent
+import com.intellij.ui.ColoredTreeCellRenderer
+import com.intellij.ui.SimpleTextAttributes
 import com.intellij.ui.components.JBScrollPane
 import com.intellij.ui.treeStructure.SimpleTree
 import com.intellij.util.ui.JBUI
@@ -42,7 +52,6 @@ import javax.swing.event.TreeExpansionListener
 import javax.swing.event.TreeSelectionEvent
 import javax.swing.event.TreeSelectionListener
 import javax.swing.tree.DefaultMutableTreeNode
-import javax.swing.tree.DefaultTreeCellRenderer
 import javax.swing.tree.DefaultTreeModel
 import javax.swing.tree.TreePath
 
@@ -50,7 +59,7 @@ import javax.swing.tree.TreePath
  * SM tool window: tree panel with multiple roots, persistent config, right-click context menu.
  * Cmd+Shift+. toggles hidden folders. Expanded state persisted across restarts.
  */
-class SmToolWindowPanel(private val project: Project) : JPanel(BorderLayout()) {
+class SmToolWindowPanel(private val project: Project) : JPanel(BorderLayout()), DataProvider {
 
     private val tree = SimpleTree()
     private val hiddenRoot = DefaultMutableTreeNode("SM")
@@ -67,36 +76,54 @@ class SmToolWindowPanel(private val project: Project) : JPanel(BorderLayout()) {
     private val expandSaveTimer = Timer(800) { persistExpandedPaths() }.apply { isRepeats = false }
     private val vfsRefreshTimer = Timer(500) { SwingUtilities.invokeLater { refreshAll() } }.apply { isRepeats = false }
 
+    /** Provides data context for IntelliJ platform actions (New, Copy, Paste, Diff, etc.) */
+    override fun getData(dataId: String): Any? {
+        val selVf = selectedVirtualFile()
+        return when (dataId) {
+            CommonDataKeys.PROJECT.name -> project
+            CommonDataKeys.VIRTUAL_FILE.name -> selVf
+            CommonDataKeys.VIRTUAL_FILE_ARRAY.name -> if (selVf != null) arrayOf(selVf) else null
+            PlatformDataKeys.DELETE_ELEMENT_PROVIDER.name -> null  // let IDE handle
+            CommonDataKeys.NAVIGATABLE.name -> selVf?.let { OpenFileDescriptor(project, it) }
+            else -> null
+        }
+    }
+
+    private fun selectedVirtualFile(): VirtualFile? {
+        val node = tree.selectionPath?.lastPathComponent as? VfNode ?: return null
+        return (node.userObject as? NodeData)?.vf
+    }
+
     init {
         border = JBUI.Borders.empty()
         tree.model = treeModel; tree.isRootVisible = false; tree.showsRootHandles = true
 
-        tree.cellRenderer = object : DefaultTreeCellRenderer() {
-            private val HIDDEN_COLOR = Color(140, 140, 140)
-            private val BROKEN_COLOR = Color(200, 80, 80)
-            private val CIRCULAR_COLOR = Color(160, 160, 160)
-            init {
-                // Prevent DefaultTreeCellRenderer painting its own background (shows as grey on Windows)
-                isOpaque = false
-                backgroundNonSelectionColor = null
-            }
-            override fun getTreeCellRendererComponent(
-                tree: JTree, value: Any?, sel: Boolean, expanded: Boolean, leaf: Boolean, row: Int, hasFocus: Boolean
-            ): Component {
-                val c = super.getTreeCellRendererComponent(tree, value, sel, expanded, leaf, row, hasFocus)
-                if (!sel) { backgroundNonSelectionColor = null; (c as? JComponent)?.isOpaque = false }
+        tree.cellRenderer = object : ColoredTreeCellRenderer() {
+            private val HIDDEN_ATTR = SimpleTextAttributes(SimpleTextAttributes.STYLE_ITALIC, Color(140, 140, 140))
+            private val BROKEN_ATTR = SimpleTextAttributes(SimpleTextAttributes.STYLE_ITALIC, Color(200, 80, 80))
+            private val CIRCULAR_ATTR = SimpleTextAttributes(SimpleTextAttributes.STYLE_ITALIC, Color(160, 160, 160))
+            override fun customizeCellRenderer(
+                tree: JTree, value: Any?, selected: Boolean, expanded: Boolean, leaf: Boolean, row: Int, hasFocus: Boolean
+            ) {
                 val node = value as? DefaultMutableTreeNode; val data = node?.userObject as? NodeData
-                if (data != null) {
-                    val base = c.font ?: UIManager.getFont("Tree.font") ?: Font("SansSerif", Font.PLAIN, 12)
-                    when {
-                        data.isCircularLink -> { c.font = base.deriveFont(Font.ITALIC); if (!sel) foreground = CIRCULAR_COLOR; toolTipText = "Circular link: ${data.linkTarget}" }
-                        data.isBrokenLink -> { c.font = base.deriveFont(Font.ITALIC); if (!sel) foreground = BROKEN_COLOR; icon = SmIcons.LINK_BROKEN; toolTipText = "Broken link → ${data.linkTarget}" }
-                        data.isLink -> { c.font = base.deriveFont(Font.PLAIN); toolTipText = "Link → ${data.linkTarget}"; val baseIcon = icon; if (baseIcon != null) { icon = com.intellij.ui.LayeredIcon(2).apply { setIcon(baseIcon, 0); setIcon(SmIcons.LINK_OVERLAY, 1) } } }
-                        data.isHiddenFolder -> { c.font = base.deriveFont(Font.ITALIC); if (!sel) foreground = HIDDEN_COLOR; toolTipText = null }
-                        else -> { c.font = base.deriveFont(Font.PLAIN); toolTipText = null }
+                if (data == null) { append(value?.toString() ?: ""); return }
+                val name = data.toString()
+                when {
+                    data.isCircularLink -> { append(name, CIRCULAR_ATTR); toolTipText = "Circular link: ${data.linkTarget}" }
+                    data.isBrokenLink -> { append(name, BROKEN_ATTR); icon = SmIcons.LINK_BROKEN; toolTipText = "Broken link → ${data.linkTarget}" }
+                    data.isLink -> {
+                        append(name, SimpleTextAttributes.REGULAR_ATTRIBUTES); toolTipText = "Link → ${data.linkTarget}"
+                        val baseIcon = data.vf?.let { if (it.isDirectory) com.intellij.icons.AllIcons.Nodes.Folder else com.intellij.icons.AllIcons.FileTypes.Any_type } ?: icon
+                        if (baseIcon != null) icon = com.intellij.ui.LayeredIcon(2).apply { setIcon(baseIcon, 0); setIcon(SmIcons.LINK_OVERLAY, 1) }
                     }
+                    data.isHiddenFolder -> { append(name, HIDDEN_ATTR); toolTipText = null }
+                    else -> { append(name, SimpleTextAttributes.REGULAR_ATTRIBUTES); toolTipText = null }
                 }
-                return c
+                // set folder/file icon for non-link nodes
+                if (!data.isLink && !data.isBrokenLink) {
+                    val vf = data.vf
+                    if (vf != null) icon = if (vf.isDirectory) com.intellij.icons.AllIcons.Nodes.Folder else com.intellij.icons.AllIcons.FileTypes.Any_type
+                }
             }
         }
         tree.toolTipText = ""
@@ -149,6 +176,7 @@ class SmToolWindowPanel(private val project: Project) : JPanel(BorderLayout()) {
         am.put("sm-toggle-hidden", object : AbstractAction() { override fun actionPerformed(e: java.awt.event.ActionEvent) { toggleHiddenFolders() } })
 
         tree.dragEnabled = true; tree.dropMode = DropMode.INSERT; tree.transferHandler = SmTreeTransferHandler(project)
+        DataManager.registerDataProvider(tree, this)
         add(JBScrollPane(tree), BorderLayout.CENTER)
 
         project.messageBus.connect().subscribe(FileEditorManagerListener.FILE_EDITOR_MANAGER, object : FileEditorManagerListener {
@@ -253,6 +281,59 @@ class SmToolWindowPanel(private val project: Project) : JPanel(BorderLayout()) {
             popup.add(JMenuItem("Add Link…").apply { addActionListener { addLink(selNode!!, selData) } })
             popup.addSeparator()
             popup.add(JMenuItem("Folder Alias…").apply { addActionListener { setAliasForNode(selNode!!, selData) } })
+            popup.addSeparator()
+        }
+
+        // --- IDE actions submenu (New from template, Copy, Paste, Delete, Diff, etc.) ---
+        if (selVf != null && !selData!!.isLink) {
+            val ideMenu = JMenu("IDE")
+            val am = ActionManager.getInstance()
+            val ctx = DataManager.getInstance().getDataContext(tree)
+
+            // New... (all IDE-registered file templates)
+            val newAction = am.getAction("NewElement")
+            if (newAction != null) {
+                val newGroup = DefaultActionGroup("New...", true)
+                newGroup.add(newAction)
+                val newPopup = am.createActionPopupMenu(ActionPlaces.POPUP, newGroup)
+                ideMenu.add(newPopup.component.getSubElements().firstOrNull()?.let {
+                    JMenuItem("New...").apply { addActionListener { newAction.actionPerformed(
+                        com.intellij.openapi.actionSystem.AnActionEvent.createFromDataContext(ActionPlaces.POPUP, null, ctx)
+                    ) } }
+                } ?: JMenuItem("New...").apply { addActionListener { newAction.actionPerformed(
+                    com.intellij.openapi.actionSystem.AnActionEvent.createFromDataContext(ActionPlaces.POPUP, null, ctx)
+                ) } })
+            }
+
+            // Copy / Paste / Cut / Delete
+            for ((label, actionId) in listOf("Copy" to "\$Copy", "Paste" to "\$Paste", "Cut" to "\$Cut", "Delete" to "\$Delete")) {
+                val action = am.getAction(actionId)
+                if (action != null) ideMenu.add(JMenuItem(label).apply { addActionListener {
+                    action.actionPerformed(com.intellij.openapi.actionSystem.AnActionEvent.createFromDataContext(ActionPlaces.POPUP, null, ctx))
+                } })
+            }
+
+            ideMenu.addSeparator()
+
+            // Copy Path/Reference (the IDE's full dialog)
+            val copyPathAction = am.getAction("CopyPaths")
+            if (copyPathAction != null) ideMenu.add(JMenuItem("Copy Path/Reference…").apply { addActionListener {
+                copyPathAction.actionPerformed(com.intellij.openapi.actionSystem.AnActionEvent.createFromDataContext(ActionPlaces.POPUP, null, ctx))
+            } })
+
+            // Compare With (file diff)
+            val diffAction = am.getAction("CompareTwoFiles") ?: am.getAction("Diff.ShowDiff")
+            if (diffAction != null) ideMenu.add(JMenuItem("Compare With…").apply { addActionListener {
+                diffAction.actionPerformed(com.intellij.openapi.actionSystem.AnActionEvent.createFromDataContext(ActionPlaces.POPUP, null, ctx))
+            } })
+
+            // Local History
+            val historyAction = am.getAction("LocalHistory.ShowHistory")
+            if (historyAction != null) ideMenu.add(JMenuItem("Local History").apply { addActionListener {
+                historyAction.actionPerformed(com.intellij.openapi.actionSystem.AnActionEvent.createFromDataContext(ActionPlaces.POPUP, null, ctx))
+            } })
+
+            popup.add(ideMenu)
             popup.addSeparator()
         }
 

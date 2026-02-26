@@ -4,7 +4,7 @@ plugins {
 }
 
 group = "sm"
-version = "2026.02.23.3"
+version = "2026.02.25.1"
 
 repositories { mavenCentral() }
 
@@ -33,4 +33,3 @@ tasks {
 
     buildSearchableOptions { enabled = false }
 }
-

@@ -83,6 +83,26 @@ object SmSettings {
 
     fun formatExts(exts: Set<String>): String = exts.sorted().joinToString(", ") { "*.${it}" }
 
+    // CSV editor: which file extensions open in the table editor
+    private const val CSV_EXTS_KEY = "sm.csvExtensions"
+    private val FACTORY_CSV_EXTS = setOf("csv", "csvai")
+    private var _csvExts: MutableSet<String>? = null
+
+    fun csvExtensions(): Set<String> {
+        if (_csvExts == null) {
+            val stored = prefs.get(CSV_EXTS_KEY, null)
+            _csvExts = if (stored != null) parseSet(stored) else FACTORY_CSV_EXTS.toMutableSet()
+        }
+        return _csvExts!!
+    }
+
+    fun setCsvExtensions(exts: Set<String>) {
+        _csvExts = exts.map { it.lowercase().trim() }.filter { it.isNotEmpty() }.toMutableSet()
+        prefs.put(CSV_EXTS_KEY, _csvExts!!.joinToString(",")); prefs.flush()
+    }
+
+    fun isCsvExtension(ext: String): Boolean = ext.lowercase() in csvExtensions()
+
     private fun zoomKey(filePath: String) = "sm.zoom.${filePath.hashCode()}"
     fun getZoom(filePath: String): Double = prefs.get(zoomKey(filePath), null)?.toDoubleOrNull() ?: 1.0
     fun setZoom(filePath: String, zoom: Double) {

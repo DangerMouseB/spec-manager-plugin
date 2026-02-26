@@ -12,6 +12,7 @@ class SmSettingsDialog(
     private val onApply: () -> Unit,
 ) : DialogWrapper(true) {
     private val globalField = JTextField(SmSettings.formatExts(SmSettings.globalHiddenExtensions()), 30)
+    private val csvExtsField = JTextField(SmSettings.formatExts(SmSettings.csvExtensions()), 30)
     private data class RootTab(val root: VirtualFile, val useGlobal: JCheckBox, val field: JTextField)
     private val rootTabs = mutableListOf<RootTab>()
     init { title = "SM Settings"; init() }
@@ -20,8 +21,15 @@ class SmSettingsDialog(
         val globalPanel = JPanel(BorderLayout(8, 8)).apply {
             border = JBUI.Borders.empty(12)
             add(JLabel("<html>Extensions to <b>hide</b> in the SM tree (comma-separated).<br>Everything else is shown.<br><i>Default: *.txt</i></html>"), BorderLayout.NORTH)
-            val row = JPanel(FlowLayout(FlowLayout.LEFT)); row.add(JLabel("Hidden:")); row.add(globalField)
-            add(row, BorderLayout.CENTER)
+            val rows = JPanel().apply { layout = BoxLayout(this, BoxLayout.Y_AXIS) }
+            val hideRow = JPanel(FlowLayout(FlowLayout.LEFT)); hideRow.add(JLabel("Hidden:")); hideRow.add(globalField)
+            rows.add(hideRow)
+            rows.add(Box.createVerticalStrut(8))
+            rows.add(JLabel("<html>Extensions opened with the SM table editor (comma-separated).<br><i>Default: *.csv, *.csvai</i></html>"))
+            rows.add(Box.createVerticalStrut(4))
+            val csvRow = JPanel(FlowLayout(FlowLayout.LEFT)); csvRow.add(JLabel("CSV:")); csvRow.add(csvExtsField)
+            rows.add(csvRow)
+            add(rows, BorderLayout.CENTER)
         }
         tabs.addTab("Global", globalPanel)
         for (root in roots) {
@@ -43,6 +51,7 @@ class SmSettingsDialog(
     }
     override fun doOKAction() {
         SmSettings.setGlobalHiddenExtensions(parseField(globalField.text))
+        SmSettings.setCsvExtensions(parseField(csvExtsField.text))
         for (rt in rootTabs) {
             if (rt.useGlobal.isSelected) SmSettings.setRootHiddenExtensions(rt.root.path, null)
             else SmSettings.setRootHiddenExtensions(rt.root.path, parseField(rt.field.text))
